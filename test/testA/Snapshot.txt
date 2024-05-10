@@ -1,0 +1,5 @@
+Entry: rickroll.txt
+Size: 0 bytes
+LastModified: 14603302533
+Permissions: 100664
+

@@ -1,0 +1,5 @@
+Entry: file3.txt
+Size: 0 bytes
+LastModified: 14617443650
+Permissions: 100664
+

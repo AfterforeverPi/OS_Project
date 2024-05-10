@@ -1,0 +1,5 @@
+Entry: testB.txt
+Size: 0 bytes
+LastModified: 14603302553
+Permissions: 100664
+
