@@ -1,5 +1,10 @@
+Entry: testC.txt
+Size: 0 bytes
+LastModified: 14617644707
+Permissions: 100664
+
 Entry: testB.txt
 Size: 0 bytes
-LastModified: 14603302553
+LastModified: 14617645672
 Permissions: 100664
 

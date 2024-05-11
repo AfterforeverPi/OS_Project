@@ -1,3 +1,8 @@
+Entry: file4.txt
+Size: 0 bytes
+LastModified: 14617646167
+Permissions: 100664
+
 Entry: file3.txt
 Size: 0 bytes
 LastModified: 14617443650
