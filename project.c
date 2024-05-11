@@ -15,14 +15,13 @@ char quarantinePath[128] = "\0";
 int checkArguments(int argc, char** argv){
 
     for(int i = 1; i < argc; i++){
-        
+        //Check for optional arguments, if one is found, skip the next argument (it is the quarantine/output directory)
         if(strcmp(argv[i], "-o") == 0){
             if(i == argc-1){
                 perror("Option arguments cannot be at the end of the command line");
             }
 
             snprintf(outputPath, sizeof(outputPath), "%s", argv[++i]);
-
         }
         else if(strcmp(argv[i], "-s") == 0){
             if(i == argc-1){
@@ -30,7 +29,6 @@ int checkArguments(int argc, char** argv){
             }
 
             snprintf(quarantinePath, sizeof(quarantinePath), "%s", argv[++i]);
-
         }
         else{
             struct stat statbuf;
@@ -45,15 +43,16 @@ int checkArguments(int argc, char** argv){
 
 }
 
-void printIndent(int indent) {
+//Utility function for helping formatting the dir tree output
+void printIndent(int indent){
     while (indent--) {
         printf("|   ");
     }
 }
 
-void fillSnapshot(char* snapPath, struct stat statbuf, struct dirent* dp, int *out) {
+void fillSnapshot(char* snapPath, struct stat statbuf, struct dirent* dp, int *out){
 
-    // Open the file if it's not already open
+    // Open the file if it is not already open
     if (*out == -1) {
         *out = open(snapPath, O_WRONLY | O_CREAT | O_TRUNC | O_APPEND, 0644);
         if (*out < 0) {
@@ -69,10 +68,10 @@ void fillSnapshot(char* snapPath, struct stat statbuf, struct dirent* dp, int *o
     write(*out, metadata, strlen(metadata));
 }
 
-
+//Function for getting the directory name for the snapshot naming
 char *getDirName(char* path){
     char* dirName = strrchr(path, '/');
-                if (dirName != NULL) {
+                if (dirName != NULL){
                     dirName++; // Skip the '/'
                 } else {
                     dirName = path; // Use the whole path if no '/'
@@ -83,39 +82,35 @@ char *getDirName(char* path){
 
 int checkPermissions(char* path, struct stat statbuf){
 
-
-    if (stat(path, &statbuf) == 0) {
+    if (stat(path, &statbuf) == 0){
         // Check individual permissions
         if (((statbuf.st_mode & S_IRUSR) == 0) && ((statbuf.st_mode & S_IWUSR) == 0) && ((statbuf.st_mode & S_IXUSR) == 0) &&
             ((statbuf.st_mode & S_IRGRP) == 0) && ((statbuf.st_mode & S_IWGRP) == 0) && ((statbuf.st_mode & S_IXGRP) == 0) &&
             ((statbuf.st_mode & S_IROTH) == 0) && ((statbuf.st_mode & S_IWOTH) == 0) && ((statbuf.st_mode & S_IXOTH) == 0)){
             return 1;
         }
-        
-
-        // Repeat for group and others (S_IRGRP, S_IWGRP, S_IXGRP, S_IROTH, S_IWOTH, S_IXOTH)
     } else {
         perror("Error reading file information");
     }
 
     return 0;
-    
 
 }
 
-void dirRead(char* basePath) {
+
+int dirRead(char* basePath){
+
     DIR *dir;
     struct dirent *dp;
     char path[1000], snapPath[1000];
     struct stat statbuf;
+    int suspFiles = 0;
 
-    if ((dir = opendir(basePath)) == NULL) {
+    if ((dir = opendir(basePath)) == NULL){
         perror("Cannot open directory");
-        return;
     }
 
-    
-
+    //If outputPath has been modified -> the optional argument is used -> change the paths accordingly
     if(strcmp(outputPath, "\0") != 0){
         snprintf(snapPath, sizeof(snapPath), "%s/%s_Snapshot.txt", outputPath, getDirName(basePath));
     }
@@ -127,9 +122,9 @@ void dirRead(char* basePath) {
         snprintf(quarantinePath, sizeof(quarantinePath), "quarantine");
     }
     
-    int out = -1;
-    while ((dp = readdir(dir)) != NULL) {
-        if (strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") && strcmp(dp->d_name, "Snapshot.txt")!= 0) {
+    int out = -1; //This variable tells the program if the snapshot file is opened or not. Without it would only store data for the last file scanned
+    while ((dp = readdir(dir)) != NULL){
+        if (strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") && strcmp(dp->d_name, "Snapshot.txt")!= 0){
 
             snprintf(path, sizeof(path), "%s/%s", basePath, dp->d_name);
             if (stat(path, &statbuf) == -1){
@@ -139,6 +134,7 @@ void dirRead(char* basePath) {
             if(checkPermissions(path, statbuf)){
                 char command[2000];
                 snprintf(command, sizeof(command), "./checkSafe.sh %s %s", path, quarantinePath);
+                suspFiles++;
                 system(command);
                 continue;
 
@@ -157,22 +153,24 @@ void dirRead(char* basePath) {
     close(out);
     closedir(dir);
     printf("Snapshot created for directory %s\n", getDirName(basePath));
+    return suspFiles;
 }
 
-void dirShow(char* basePath, int depth) {
+//Utility function for displaying the directory tree, it skips special files like snapshots, output/quarantine dirs
+void dirShow(char* basePath, int depth){
+
     DIR *dir;
     struct dirent *dp;
     char path[1000];
     struct stat statbuf;
 
-    if ((dir = opendir(basePath)) == NULL) {
+    if ((dir = opendir(basePath)) == NULL){
         perror("Cannot open directory");
         return;
     }
     
     while ((dp = readdir(dir)) != NULL) {
-        if (strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") && strcmp(dp->d_name, "Snapshot.txt")!= 0) {
-
+        if (strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") && strcmp(dp->d_name, "Snapshot.txt")!= 0){
             snprintf(path, sizeof(path), "%s/%s", basePath, dp->d_name);
             if (stat(path, &statbuf) == -1){
                continue;
@@ -188,7 +186,6 @@ void dirShow(char* basePath, int depth) {
                 printIndent(depth);
                 printf("|_ %s\n", dp->d_name);
             }
-
         }
     }
 
@@ -196,33 +193,32 @@ void dirShow(char* basePath, int depth) {
 }
 
 
-void dirParse(int argc, char** argv) {
+void dirParse(int argc, char** argv){
     int status;
-    for (int i = 1; i < argc; i++) {
+    int suspFiles = 0;
+    for (int i = 1; i < argc; i++){
         if ((strcmp(argv[i], "-o") == 0) || (strcmp(argv[i], "-s") == 0)) {
             i++;
             continue;
         }
 
-        int pid = fork(); // Get the PID inside the loop
+        int pid = fork();
 
         if (pid == 0) {
-            dirRead(argv[i]);
+            suspFiles = dirRead(argv[i]);
             exit(0);
         } else {
             wait(&status);
             if(WIFEXITED(status)){
                 int exitCode = WEXITSTATUS(status);
-                printf("Child process %d has been executed with exit code %d\n", pid, exitCode);
+                printf("Child process %d has been executed with exit code %d and %d dangerous files\n", pid, exitCode, suspFiles);
             }
         }
-
     }
 
     printf("\n\n");
 
     for(int i = 1; i < argc; i++){
-
         if ((strcmp(argv[i], "-o") == 0) || (strcmp(argv[i], "-s") == 0)) {
             i++;
             continue;
@@ -230,27 +226,22 @@ void dirParse(int argc, char** argv) {
         printf("%s\n", argv[i]);
         dirShow(argv[i], 0);
         putchar('\n');
-
     }
 
 }
 
 
-
 int main(int argc, char** argv){
 
 
-    if(argc > 10){
+    if(argc > 10 && argc < 2){
         perror("Invalid number of arguments\n");
     }
 
     if(!checkArguments(argc, argv))
         perror("Only directories are allowed as arguments\n");
-
     
     dirParse(argc, argv);
     
-
-
     return 0;
 }
